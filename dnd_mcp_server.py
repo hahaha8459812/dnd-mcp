@@ -5,11 +5,11 @@ D&D Knowledge Navigator - Main server entry point.
 This script starts the FastMCP server that provides D&D 5e information
 through the Model Context Protocol (MCP).
 """
-
 import logging
 import sys
 import traceback
 import os
+import uvicorn  # 确保导入 uvicorn
 from mcp.server.fastmcp import FastMCP
 
 # Import from our reorganized structure
@@ -20,60 +20,26 @@ from src.core import tools
 from src.core import resources
 from src.core.cache import APICache
 
-# Configure more detailed logging
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "dnd_mcp_server.log")
+# --- 全局作用域配置 ---
+app = FastMCP("dnd-knowledge-navigator")
+cache_dir = os.path.join(os.path.dirname(__file__), ".cache")
+cache = APICache(ttl_hours=24, persistent=True, cache_dir=cache_dir)
 
-# Configure logging with both console and file output
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler(sys.stderr)
-    ]
-)
-logger = logging.getLogger(__name__)
+resources.register_resources(app, cache)
+tools.register_tools(app, cache)
+prompts.register_prompts(app)
+# ---------------------
 
-
-def main():
-    """Main entry point for the D&D Knowledge Navigator server."""
-    # Add debug output
-    print("Starting D&D Knowledge Navigator with FastMCP...", file=sys.stderr)
-    print(f"Python version: {sys.version}", file=sys.stderr)
-    print(f"Current directory: {os.getcwd()}", file=sys.stderr)
-    print(
-        f"Logs will be saved to: {os.path.abspath(log_file)}", file=sys.stderr)
-
-    try:
-        # Create FastMCP server
-        print("Creating FastMCP server...", file=sys.stderr)
-        app = FastMCP("dnd-knowledge-navigator")
-        print("FastMCP server created successfully", file=sys.stderr)
-
-        # Create shared cache with 24-hour TTL and persistence
-        cache_dir = os.path.join(os.path.dirname(__file__), "cache")
-        cache = APICache(ttl_hours=24, persistent=True, cache_dir=cache_dir)
-        print(
-            f"API cache initialized (24-hour TTL, persistent cache in {cache_dir})", file=sys.stderr)
-
-        # Register components
-        resources.register_resources(app, cache)
-        tools.register_tools(app, cache)
-        prompts.register_prompts(app)
-
-        # Run the app
-        print("Running FastMCP app...", file=sys.stderr)
-        app.run()
-        print("App run completed", file=sys.stderr)
-        return 0
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        return 1
-
-
-# For direct execution, we use the main() function
+# 这个 if __name__ == "__main__" 块是 Hugging Face 启动的入口
 if __name__ == "__main__":
-    sys.exit(main())
+    # 从环境变量中获取端口，Hugging Face 默认提供 7860
+    # 如果在本地运行，没有 PORT 环境变量，则回退使用 9451
+    port = int(os.environ.get('PORT', 9451))
+    
+    # 在云平台上，必须监听 0.0.0.0
+    host = '0.0.0.0'
+    
+    print(f"Starting server on {host}:{port}")
+    
+    # 使用 uvicorn 来以网络模式运行我们的 app
+    uvicorn.run(app, host=host, port=port)
