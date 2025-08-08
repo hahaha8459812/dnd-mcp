@@ -1,12 +1,3 @@
----
-title: D&D Knowledge Navigator
-emoji: 🐉
-colorFrom: green
-colorTo: blue
-sdk: python
-app_file: dnd_mcp_server.py
----
-
 # D&D Knowledge Navigator
 
 A Python-based server implementing the Model Context Protocol (MCP) that connects Claude and other AI assistants to Dungeons & Dragons 5e game information.
